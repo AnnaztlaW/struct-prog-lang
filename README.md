@@ -1,2 +1,2 @@
 # struct-prog-lang
-Fall 2025 Structures of Programming Languages
+Fall 2025 Structures of Programming Languages class code
