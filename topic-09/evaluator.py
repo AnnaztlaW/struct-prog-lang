@@ -3,6 +3,13 @@ from parser import parse
 from pprint import pprint
 import copy
 
+def watch(var_name, value, position=None):
+    if position:
+        print(f"[watch] {var_name} = {value} at position {position}")
+    else:
+        print(f"[watch] {var_name} = {value}")
+
+
 def type_of(*args):
     def single_type(x):
         if isinstance(x, bool):
@@ -479,6 +486,7 @@ def evaluate(ast, environment):
         assert "target" in ast
         target = ast["target"]
 
+        # Find where to assign
         if target["tag"] == "identifier":
             name = target["value"]
 
@@ -489,7 +497,6 @@ def evaluate(ast, environment):
                 assert scope is not None, f"Extern assignment: '{name}' not found in any outer scope"
                 target_base = scope
             else:
-                # Always assign to local scope
                 target_base = environment
 
             target_index = name
@@ -522,8 +529,14 @@ def evaluate(ast, environment):
         value, value_status = evaluate(ast["value"], environment)
         if value_status == "exit": return value, "exit"
 
+        #  Do the assignment
         target_base[target_index] = value
+
+        if isinstance(target_index, str):
+            watch(target_index, value)
+
         return value, None
+
 
     if ast["tag"] == "return":
         if "value" in ast and ast["value"] is not None: # Checks if 'return' has an expression

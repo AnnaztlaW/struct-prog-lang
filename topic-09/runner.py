@@ -9,44 +9,47 @@ from evaluator import evaluate
 
 def main():
     environment = {}
-    
+
+    watch_identifier = None
+
     # Check for command line arguments
-    if len(sys.argv) > 1:
-        # Filename provided, read and execute it
-        with open(sys.argv[1], 'r') as f:
-            source_code = f.read()
+    for arg in sys.argv[1:]:
+        if arg.startswith("watch="):
+            watch_identifier = arg.split("=", 1)[1]
+
+    filename = None
+    for arg in sys.argv[1:]:
+        if not arg.startswith("watch="):
+            filename = arg
+            break
+
+    # Hook for tracking watched identifier
+    # evaluator will call this whenever an id changes
+    def watch_callback(name, value, location):
+        if watch_identifier == name:
+            line, col = location
+            print(f"[watch] {name} = {value}  (line {line}, col {col})")
+
+    environment["__watch_callback__"] = watch_callback
+
+
+    # File Execution ---
+    if filename:
         try:
+            with open(filename, 'r') as f:
+                source_code = f.read()
+
             tokens = tokenize(source_code)
             ast = parse(tokens)
             final_value, exit_status = evaluate(ast, environment)
+
             if exit_status == "exit":
-                # print(f"Exiting with code: {final_value}") # Optional debug print
                 sys.exit(final_value if isinstance(final_value, int) else 0)
+
         except Exception as e:
             print(f"Error: {e}")
-            sys.exit(1) # Indicate error to OS
-    else:
-        # REPL loop
-        while True:
-            try:
-                # Read input
-                source_code = input('>> ')
+            sys.exit(1)
 
-                # Exit condition for the REPL loop
-                if source_code.strip() in ['exit', 'quit']:
-                    break
-
-                # Tokenize, parse, and execute the code
-                tokens = tokenize(source_code)
-                ast = parse(tokens)
-                final_value, exit_status = evaluate(ast, environment)
-                if exit_status == "exit":
-                    print(f"Exiting with code: {final_value}") # REPL can print this
-                    sys.exit(final_value if isinstance(final_value, int) else 0)
-                elif final_value is not None: # Print result in REPL if not None
-                    print(final_value)
-            except Exception as e:
-                print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()

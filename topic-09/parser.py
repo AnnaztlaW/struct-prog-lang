@@ -1,13 +1,6 @@
 from tokenizer import tokenize
 from pprint import pprint
 
-# *(&(*& NOTES))
-
-# can't have a function literal take part in an assignment if there are other operators.
-
-# can't look for function in block for assignment
-
-
 
 # NOTE - ADD simple-expression = ... "(" expression ")"
 
@@ -48,6 +41,13 @@ grammar = """
 
     program = [ statement { ";" statement } {";"} ]
     """
+
+def watch(var_name, value, position=None):
+    if position:
+        print(f"[watch] {var_name} = {value} at position {position}")
+    else:
+        print(f"[watch] {var_name} = {value}")
+
 
 # BASIC EXPRESSIONS
 
