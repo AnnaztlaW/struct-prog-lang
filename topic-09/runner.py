@@ -32,10 +32,10 @@ def main():
 
     environment["__watch_callback__"] = watch_callback
 
-
-    # File Execution ---
+    # Check for command line arguments
     if filename:
         try:
+            # Filename provided, read and execute it
             with open(filename, 'r') as f:
                 source_code = f.read()
 
