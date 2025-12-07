@@ -2,8 +2,6 @@ from tokenizer import tokenize
 from pprint import pprint
 
 
-# NOTE - ADD simple-expression = ... "(" expression ")"
-
 grammar = """
     simple_expression = identifier | <boolean> | <number> | <string> | <null> | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
 
@@ -30,6 +28,11 @@ grammar = """
 
     if_statement = "if" "(" expression ")" statement_list [ "else" (if_statement | statement_list) ]
     while_statement = "while" "(" expression ")" statement_list
+
+    switch_statement = "switch" "(" expression ")" "{" { case_clause } [ default_clause ] "}"
+    case_clause = "case" expression ":" statement_list
+    default_clause = "default" ":" statement_list
+
     statement_list = "{" statement { ";" statement } "}"
     exit_statement = "exit" [ expression ]
     assert_statement = "assert" expression [ "," expression ]
@@ -42,15 +45,7 @@ grammar = """
     program = [ statement { ";" statement } {";"} ]
     """
 
-def watch(var_name, value, position=None):
-    if position:
-        print(f"[watch] {var_name} = {value} at position {position}")
-    else:
-        print(f"[watch] {var_name} = {value}")
-
-
 # BASIC EXPRESSIONS
-
 
 def parse_simple_expression(tokens):
     """
@@ -1068,6 +1063,133 @@ def parse_while_statement(tokens):
     do_statements, tokens = parse_statement_list(tokens[1:])
     return {"tag": "while", "condition": condition, "do": do_statements}, tokens
 
+####################################################################################################
+
+
+
+
+def parse_case_clause(tokens):
+    """
+    case_clause = "case" expression ":" statement_list
+    """
+    assert tokens[0]["tag"] == "case"
+    tokens = tokens[1:]
+    expr, tokens = parse_expression(tokens)
+    if tokens and tokens[0]["tag"] == ":":
+        tokens = tokens[1:]
+    stmts, tokens = parse_statement_list(tokens)
+    return {"expression": expr, "statements": stmts}, tokens
+
+def test_parse_case_clause():
+    """
+    case_clause = "case" expression ":" statement_list
+    """
+    print("testing parse_case_clause.")
+    ast, tokens = parse_case_clause(tokenize("case 1{print 1}"))
+    assert ast == {
+        "expression": {"tag": "number", "value": 1},
+        "statements": {
+            "tag": "statement_list",
+            "statements": [{"tag": "print", "value": {"tag": "number", "value": 1}}],
+        },
+    }
+
+
+def parse_default_clause(tokens):
+    """
+    default_clause = "default" ":" statement_list
+    """
+    assert tokens[0]["tag"] == "default"
+    tokens = tokens[1:]
+    if tokens and tokens[0]["tag"] == ":":
+        tokens = tokens[1:]
+    stmts, tokens = parse_statement_list(tokens)
+    return {"statements": stmts}, tokens
+
+def test_parse_default_clause():
+    """
+    default_clause = "default" ":" statement_list
+    """
+    print("testing parse_default_clause.")
+    ast, tokens = parse_default_clause(tokenize("default{print 0}"))
+    assert ast == {
+        "statements": {
+            "tag": "statement_list",
+            "statements": [{"tag": "print", "value": {"tag": "number", "value": 0}}],
+        }
+    }
+
+
+def parse_switch_statement(tokens):
+    """
+    switch_statement = "switch" "(" expression ")" "{" { case_clause } [ default_clause ] "}"
+    """
+    assert tokens[0]["tag"] == "switch"
+    tokens = tokens[1:]
+    assert tokens[0]["tag"] == "(", f"Expected '(' at position {tokens[0]['position']}"
+    condition, tokens = parse_expression(tokens[1:])
+    assert tokens[0]["tag"] == ")", f"Expected ')' at position {tokens[0]['position']}"
+    tokens = tokens[1:]
+    assert tokens[0]["tag"] == "{", f"Expected '{{' at position {tokens[0]['position']}"
+    tokens = tokens[1:]
+    cases = []
+    while tokens[0]["tag"] == "case":
+        case_node, tokens = parse_case_clause(tokens)
+        cases.append(case_node)
+    default = None
+    if tokens[0]["tag"] == "default":
+        default, tokens = parse_default_clause(tokens)
+    assert tokens[0]["tag"] == "}", f"Expected '}}' at position {tokens[0]['position']}"
+    tokens = tokens[1:]
+    return {
+        "tag": "switch",
+        "condition": condition,
+        "cases": cases,
+        "default": default,
+    }, tokens
+
+def test_parse_switch_statement():
+    """
+    switch_statement = "switch" "(" expression ")" "{" { case_clause } [ default_clause ] "}"
+    """
+    print("testing parse_switch_statement.")
+    tokens = "switch(x){case 1{print 1}case 2{print 2}}"
+    ast, tokens = parse_switch_statement(tokenize(tokens))
+    assert ast == {
+        "tag": "switch",
+        "condition": {"tag": "identifier", "value": "x"},
+        "cases": [
+            {
+                "expression": {"tag": "number", "value": 1},
+                "statements": {
+                    "tag": "statement_list",
+                    "statements": [
+                        {"tag": "print", "value": {"tag": "number", "value": 1}}
+                    ],
+                },
+            },
+            {
+                "expression": {"tag": "number", "value": 2},
+                "statements": {
+                    "tag": "statement_list",
+                    "statements": [
+                        {"tag": "print", "value": {"tag": "number", "value": 2}}
+                    ],
+                },
+            },
+        ],
+        "default": None,
+    }
+    tokens = "switch(y){case 3{print 3}default{print 0}}"
+    ast, tokens = parse_switch_statement(tokenize(tokens))
+    assert ast["tag"] == "switch"
+
+
+
+################################################################################
+
+
+
 
 def test_parse_while_statement():
     """
@@ -1277,7 +1399,7 @@ def test_parse_function_statement():
 
 def parse_statement(tokens):
     """
-    statement = if_statement | while_statement | function_statement | return_statement | print_statement | exit_statement | import_statement | break_statement | continue_statement | assert_statement | expression
+    statement = if_statement | while_statement | switch_statement | function_statement | return_statement | print_statement | exit_statement | import_statement | break_statement | continue_statement | assert_statement | expression
     """
     tag = tokens[0]["tag"]
     # note: none of these consumes a token
@@ -1285,6 +1407,10 @@ def parse_statement(tokens):
         return parse_if_statement(tokens)
     if tag == "while":
         return parse_while_statement(tokens)
+    #####################
+    if tag == "switch":
+        return parse_switch_statement(tokens)
+    #####################
     if tag == "function":
         return parse_function_statement(tokens)
     if tag == "return":
@@ -1460,6 +1586,7 @@ if __name__ == "__main__":
         test_parse_statement_list,
         test_parse_if_statement,
         test_parse_while_statement,
+        test_parse_switch_statement,
         test_parse_return_statement,
         test_parse_print_statement,
         test_parse_function_statement,

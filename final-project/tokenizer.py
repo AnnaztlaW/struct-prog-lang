@@ -1,6 +1,11 @@
 import re
 
 patterns = [
+    [r"switch", "switch"],  # switch keyword
+    [r"case", "case"],  # case keyword for switch
+    [r"default", "default"],  # default keyword for switch
+    
+
     [r"//[^\n]*", "comment"],  # Comment
     [r"\s+", "whitespace"],  # Whitespace
     [r"\d*\.\d+|\d+\.\d*|\d+", "number"],  # numeric literals
@@ -236,6 +241,9 @@ def test_multiple_tokens():
 def test_keywords():
     print("testing keywords...")
     for keyword in [
+        "switch",
+        "case",
+        "default",
         "function",
         "return",
         "if",
